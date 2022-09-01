@@ -33,10 +33,27 @@ using namespace  std::chrono_literals;
 #include "TCP.h"
 
 
+//**********************
+//		   temp
+//**********************
+void create_example_file() {
+	std::ofstream file("SRC/file.ot");
+	for (int i = 0; i < 1000; i++)
+	{
+		const char endl = '\n';
+		char rep = 48 + i%10;
+		file.write(&rep, 1);
+		file.write(&endl, 1);
+	}
+	file.close();
+}
+
+
 bool stop = false;
 
 int main()
 {
+	//create_example_file();
 	printf("\n\n\n\MAIN sarting server thread...\n");
 	std::thread task1(sender_task);
 	//std::thread task1(server_task_UDP);

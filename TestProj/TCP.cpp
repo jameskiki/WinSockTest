@@ -132,7 +132,7 @@ bool TCP::SendChars(SOCKET sock, const char* buf, int len)
 	int n_loop = len / maxMsgLen;
 
 	int i;
-	for(i = 0; i < n_loop; i++)
+	for(i = 0; i <= n_loop; i++)
 	{
 		int it_len = ((len > maxMsgLen) ? maxMsgLen : len);
 
@@ -195,7 +195,7 @@ char* TCP::ReceiveFromSocketString(SOCKET sock, int * toatl_len)
 			{
 			case WSAETIMEDOUT:
 				printf("recv failed, timed out\n");
-				if (timeoutcntr > 5)
+				if (timeoutcntr > 1)
 				{
 					timeoutLimReached = true;
 				}
@@ -228,8 +228,10 @@ char* TCP::ReceiveFromSocketString(SOCKET sock, int * toatl_len)
 
 		i += 1;
 	} while (!timeoutLimReached && recv_size == BUFLEN );
+
+	*toatl_len = i * BUFLEN + recv_size;
 	
-	printf("Received %i bytes\n", i * BUFLEN + recv_size);
+	printf("Received %i bytes\n", *toatl_len);
 
 /*	for (int i = 0; i < i * BUFLEN + recv_size - 1; i++)
 	{
