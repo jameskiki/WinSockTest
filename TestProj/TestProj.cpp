@@ -20,10 +20,11 @@ void server_task_UDP();
 
 using namespace  std::chrono_literals;
 
-#define CLIENT_IP "127.0.0.1"
-#define SERVER_IP  "160.85.93.203"
+#define CLIENT_IP "160.85.110.163"
+#define CLIENT_PORT 3000
+#define SERVER_IP  "127.0.0.1"
+#define SERVER_PORT 4000
 #define BUFLEN 512	//Max length of buffer
-#define PORT 3000	//The port on which to listen for incoming data
 
 
 bool stop = false;
@@ -35,12 +36,12 @@ int main()
 	return 0;*/
 
 	printf("\nMAIN sarting server thread...\n");
-	std::thread server(server_task_UDP);
+	std::thread server(server_task_TCP);
 	std::this_thread::sleep_for(2s);
 	printf("\nMAIN sarting client thread...\n");
-	std::thread client(client_task_UDP);
+	std::thread client(client_task_TCP);
 
-	//server.join();
+	server.join();
 	client.join();
 	printf("MAIN terminating execution...\n");
 }
@@ -78,44 +79,47 @@ void client_task_UDP() {
 	sockaddr_in my_socket_addr;
 	memset(&my_socket_addr, 0, sizeof(my_socket_addr));
 	my_socket_addr.sin_family = AF_INET;
-	my_socket_addr.sin_port = htons(PORT);
-	inet_pton(AF_INET, "160.85.110.60", &my_socket_addr.sin_addr.S_un.S_addr);
+	my_socket_addr.sin_port = htons(CLIENT_PORT);
+	inet_pton(AF_INET, CLIENT_IP, &my_socket_addr.sin_addr.S_un.S_addr);
 
-	if (bind(s, (struct sockaddr*)&my_socket_addr, sizeof(my_socket_addr)) == SOCKET_ERROR)
+	auto retval = bind(s, (struct sockaddr*)&my_socket_addr, sizeof(my_socket_addr));
+	if (retval == SOCKET_ERROR)
 	{
-		printf("CLIENT Bind failed with error code : %d", WSAGetLastError());
-		exit(EXIT_FAILURE);
+		auto error = WSAGetLastError();
+		switch (error)
+		{
+		case WSAEADDRNOTAVAIL:
+			printf("CLIENT Bind failed, Adress not available\n");
+			exit(error);
+			break;
+		default:
+			printf("CLIENT Bind failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+			break;
+		}
 	}
+	printf("CLIENT socket bound...\n");
 
 	//setup address structure for server
 	memset((char*)&si_other, 0, sizeof(si_other));
 	si_other.sin_family = AF_INET;
-	si_other.sin_port = htons(PORT);
+	si_other.sin_port = htons(SERVER_PORT);
 	if (!inet_pton(AF_INET, SERVER_IP, &si_other.sin_addr.S_un.S_addr)) {
-		printf("CLIENT could not set IP");
-	}
-
-
-	// inform server that client is alive
-	//send the message
-	std::string msg = "hello pat";
-	if (sendto(s, msg.c_str(), msg.length(), 0, (struct sockaddr*)&si_other, slen) == SOCKET_ERROR)
-	{
-		printf("sendto() failed with error code : %d", WSAGetLastError());
+		printf("CLIENT could not set IP of server\n");
 	}
 
 
 	//start communication
 	while (1)
 	{
-		//printf("Enter message : ");
-		//std::cin >> message;
 
-		////send the message
-		//if (sendto(s, message, strlen(message), 0, (struct sockaddr*)&si_other, slen) == SOCKET_ERROR)
-		//{
-		//	printf("sendto() failed with error code : %d", WSAGetLastError());
-		//}
+		// inform server that client is alive
+		//send the message
+		std::string msg = "hello pat";
+		if (sendto(s, msg.c_str(), msg.length(), 0, (struct sockaddr*)&si_other, slen) == SOCKET_ERROR)
+		{
+			printf("sendto() failed with error code : %d", WSAGetLastError());
+		}
 
 		//receive a reply and print it
 		//clear the buffer by filling null, it might have previously received data
@@ -125,8 +129,12 @@ void client_task_UDP() {
 		{
 			printf("recvfrom() failed with error code : %d", WSAGetLastError());
 		}
-
-		puts(buf);
+		else
+		{
+			puts(buf);
+			return;
+		}
+		printf("CLIENT Retry...\n");
 	}
 
 	closesocket(s);
@@ -163,20 +171,31 @@ void server_task_UDP() {
 	//Prepare the sockaddr_in structure
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(PORT);
+	server.sin_port = htons(SERVER_PORT);
 
 	//Bind
-	if (bind(s, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
+	auto retval = bind(s, (struct sockaddr*)&server, sizeof(server));
+	if (retval == SOCKET_ERROR)
 	{
-		printf("Bind failed with error code : %d", WSAGetLastError());
-		exit(EXIT_FAILURE);
+		auto error = WSAGetLastError();
+		switch (error)
+		{
+		case WSAEADDRNOTAVAIL:
+			printf("SERVER Bind failed, Adress not available\n");
+			break;
+		default:
+			printf("SERVER Bind failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+			break;
+		}
+		
 	}
-	puts("Bind done");
+	puts("SERVER Bind done");
 
 	//keep listening for data
 	while (1)
 	{
-		printf("Waiting for data...");
+		printf("SERVER Waiting for data...");
 		fflush(stdout);
 
 		//clear the buffer by filling null, it might have previously received data
@@ -185,22 +204,27 @@ void server_task_UDP() {
 		//try to receive some data, this is a blocking call
 		if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr*)&si_other, &slen)) == SOCKET_ERROR)
 		{
-			printf("recvfrom() failed with error code : %d", WSAGetLastError());
+			printf("SERVER recvfrom() failed with error code : %d", WSAGetLastError());
 			exit(EXIT_FAILURE);
 		}
 
 		//print details of the client/peer and the data received
 		char addr[25];
 		inet_ntop(AF_INET, &si_other.sin_addr, addr, 25);
-		printf("Received packet from %s:%d\n",addr, ntohs(si_other.sin_port));
-		printf("Data: %s\n", buf);
+		printf("SERVER Received packet from %s:%d\n",addr, ntohs(si_other.sin_port));
+		printf("SERVER Data: %s\n", buf);
 
 		//now reply the client with the same data
 		if (sendto(s, buf, recv_len, 0, (struct sockaddr*)&si_other, slen) == SOCKET_ERROR)
 		{
-			printf("sendto() failed with error code : %d", WSAGetLastError());
+			printf("SERVER sendto() failed with error code : %d", WSAGetLastError());
 			exit(EXIT_FAILURE);
 		}
+		else
+		{
+			return;
+		}
+		printf("SERVER Retry...\n");
 	}
 
 	closesocket(s);
@@ -246,9 +270,9 @@ void client_task_TCP() {
 		//return;
 	}
 	server.sin_family = AF_INET;
-	server.sin_port = htons(PORT);
+	server.sin_port = htons(SERVER_PORT);
 
-	printf("CLIENT setup as: ip %u \t port %i\n", server.sin_addr.s_addr, PORT);
+	printf("CLIENT setup as: ip %u \t port %i\n", server.sin_addr.s_addr, CLIENT_PORT);
 
 	//Connect to remote server
 
@@ -317,9 +341,9 @@ void server_task_TCP() {
 		printf("CLIENT failed to set server IP.\n");
 		//return;
 	}
-	server.sin_port = htons(PORT);
+	server.sin_port = htons(SERVER_PORT);
 
-	printf("SERVER setup as: ip %u \t port %i\n", server.sin_addr.s_addr, PORT);
+	printf("SERVER setup as: ip %u \t port %i\n", server.sin_addr.s_addr, SERVER_PORT);
 
 	//Bind
 	if (bind(s, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
