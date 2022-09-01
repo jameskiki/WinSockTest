@@ -24,9 +24,21 @@
     <ClCompile Include="SocketWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="UDP.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TCP.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SocketWrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UDP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TCP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
