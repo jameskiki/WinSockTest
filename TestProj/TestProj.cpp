@@ -20,7 +20,7 @@ void server_task_UDP();
 
 using namespace  std::chrono_literals;
 
-#define CLIENT_IP "160.85.110.163"
+#define CLIENT_IP "127.0.0.1"
 #define CLIENT_PORT 3000
 #define SERVER_IP  "127.0.0.1"
 #define SERVER_PORT 4000
@@ -36,10 +36,10 @@ int main()
 	return 0;*/
 
 	printf("\nMAIN sarting server thread...\n");
-	std::thread server(server_task_TCP);
+	std::thread server(server_task_UDP);
 	std::this_thread::sleep_for(2s);
 	printf("\nMAIN sarting client thread...\n");
-	std::thread client(client_task_TCP);
+	std::thread client(client_task_UDP);
 
 	server.join();
 	client.join();
@@ -98,6 +98,11 @@ void client_task_UDP() {
 			break;
 		}
 	}
+	{
+		char buff[255];
+		auto ip = inet_ntop(AF_INET, &my_socket_addr.sin_addr.S_un.S_addr, buff, 255);
+		printf("CLIENT Set own info: ip %s, port %i\n", ip, SERVER_PORT);
+	}
 	printf("CLIENT socket bound...\n");
 
 	//setup address structure for server
@@ -106,6 +111,13 @@ void client_task_UDP() {
 	si_other.sin_port = htons(SERVER_PORT);
 	if (!inet_pton(AF_INET, SERVER_IP, &si_other.sin_addr.S_un.S_addr)) {
 		printf("CLIENT could not set IP of server\n");
+		exit(-1);
+	}
+	else
+	{
+		char buff[255];
+		auto ip = inet_ntop(AF_INET, &si_other.sin_addr.S_un.S_addr, buff, 255);
+		printf("CLIENT Set target info for server: ip %s, port %i\n", ip, SERVER_PORT);
 	}
 
 
@@ -116,9 +128,25 @@ void client_task_UDP() {
 		// inform server that client is alive
 		//send the message
 		std::string msg = "hello pat";
-		if (sendto(s, msg.c_str(), msg.length(), 0, (struct sockaddr*)&si_other, slen) == SOCKET_ERROR)
+		auto retval = sendto(s, msg.c_str(), msg.length(), 0, (struct sockaddr*)&si_other, slen);
+		if (retval == SOCKET_ERROR)
 		{
-			printf("sendto() failed with error code : %d", WSAGetLastError());
+			auto error = WSAGetLastError();
+			switch (error)
+			{
+			case WSAEADDRNOTAVAIL:
+				printf("CLIENT Bind failed, Adress not available\n");
+				exit(error);
+				break;
+			case WSAENETUNREACH: 
+				printf("CLIENT Bind failed, Network not reachable\n");
+				exit(error);
+				break;
+			default:
+				printf("CLIENT Bind failed with error code : %d", WSAGetLastError());
+				exit(EXIT_FAILURE);
+				break;
+			}
 		}
 
 		//receive a reply and print it
@@ -170,7 +198,8 @@ void server_task_UDP() {
 
 	//Prepare the sockaddr_in structure
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
+	//server.sin_addr.s_addr = INADDR_ANY;
+	inet_pton(AF_INET, SERVER_IP, &server.sin_addr.S_un.S_addr);
 	server.sin_port = htons(SERVER_PORT);
 
 	//Bind
@@ -189,6 +218,12 @@ void server_task_UDP() {
 			break;
 		}
 		
+	}
+	else
+	{
+		char buff[255];
+		auto ip = inet_ntop(AF_INET, &server.sin_addr.S_un.S_addr, buff, 255);
+		printf("SERVER Set own info: ip %s, port %i\n", ip, SERVER_PORT);
 	}
 	puts("SERVER Bind done");
 
