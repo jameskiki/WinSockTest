@@ -62,8 +62,8 @@ int main()
 	std::this_thread::sleep_for(2s);
 
 	printf("\n\n\nMAIN sarting client thread...\n");
-	std::thread task2(receiver_task);
-	//std::thread task2(client_task_UDP);
+	//std::thread task2(receiver_task);
+	std::thread task2(client_task_UDP);
 	//std::thread task2(client_task_TCP);
 
 	task1.join();

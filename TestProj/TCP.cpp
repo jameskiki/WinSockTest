@@ -128,9 +128,10 @@ bool TCP::SendChars(SOCKET sock, const char* buf, int len)
 		printf("Sending socket is invalid...\n");
 		return false;
 	}
+	printf("\n");
 
 	int n_loop = len / maxMsgLen;
-
+	int downsampler = 50;
 	int i;
 	for(i = 0; i <= n_loop; i++)
 	{
@@ -156,7 +157,12 @@ bool TCP::SendChars(SOCKET sock, const char* buf, int len)
 			return false;
 		}
 		len -= maxMsgLen;
+		if (i%downsampler == 0)
+		{
+			printf("%3.2f of send operation done...\r", float(i * 100 / n_loop));
+		}
 	}
+	printf("\n");
 	return true;
 }
 
